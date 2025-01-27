@@ -1,36 +1,37 @@
 import json
 import os
 
-# Load student data from the JSON file
 def load_student_data():
     try:
-        # Ensure the file is correctly referenced relative to the location of the Python script
-        file_path = os.path.join(os.path.dirname(__file__), '..', 'q-vercel-python.json')  # Path to parent directory
+        file_path = os.path.join(os.path.dirname(__file__), '..', 'q-vercel-python.json')
+        print(f"Loading student data from: {file_path}")  # Log the file path
+        
         with open(file_path, 'r') as file:
             return json.load(file)
     except FileNotFoundError:
-        return None  # Handle case where file is not found
+        print("File not found.")
+        return None
     except json.JSONDecodeError:
-        return None  # Handle invalid JSON error
+        print("Error decoding JSON.")
+        return None
+    except Exception as e:
+        print(f"Unexpected error: {str(e)}")
+        return None
 
 def handler(request):
     try:
-        # Load the student data
         students_data = load_student_data()
 
-        # Check if the JSON file was loaded successfully
         if students_data is None:
+            print("Student data could not be loaded.")
             return json.dumps({"error": "Failed to load student data"}), 500, {"Content-Type": "application/json"}
 
-        # Get query parameters from the request
         query_params = request.query_params
-        names = query_params.get('name', [])  # Get names from query (default to empty list)
+        names = query_params.get('name', [])
 
-        # If the names are passed as a single string, convert to a list
         if isinstance(names, str):
-            names = [names]
+            names = [names]  # Ensure names are in a list format
 
-        # Find the marks for the requested names
         result = []
         for name in names:
             student = next((s for s in students_data if s['name'] == name), None)
@@ -38,10 +39,10 @@ def handler(request):
                 result.append({"name": name, "marks": student["marks"]})
             else:
                 result.append({"name": name, "marks": "Not Found"})
-        
-        # Return the result as a JSON response with status code 200
+
+        print(f"Returning result: {result}")
         return json.dumps(result), 200, {"Content-Type": "application/json"}
     
     except Exception as e:
-        # Catch any exceptions and return a 500 error with a message
+        print(f"An error occurred: {str(e)}")
         return json.dumps({"error": f"An error occurred: {str(e)}"}), 500, {"Content-Type": "application/json"}
