@@ -1,55 +1,33 @@
 import json
-import os
-from http.server import BaseHTTPRequestHandler, HTTPServer
-from urllib.parse import urlparse, parse_qs
 
-# Load the data from the q-vercel-python.json file
-def load_data():
-    file_path = "q-vercel-python.json"
-    if os.path.exists(file_path):
-        with open(file_path, "r") as file:
-            return json.load(file)
-    return []
+# Load student data from the JSON file
+def load_student_data():
+    with open('q-vercel-python.json', 'r') as file:  # Use the correct relative path
+        return json.load(file)
 
-# Helper function to get marks by name
-def get_marks(names, data):
-    result = []
-    name_to_marks = {entry["name"]: entry["marks"] for entry in data}
-    for name in names:
-        result.append(name_to_marks.get(name, None))
-    return result
+def handler(request):
+    try:
+        # Load the student data
+        students_data = load_student_data()
 
-# Main request handler for the API
-class RequestHandler(BaseHTTPRequestHandler):
-    def _send_json_response(self, data, status_code=200):
-        self.send_response(status_code)
-        self.send_header("Content-type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        # Get query parameters from the request
+        query_params = request.query_params
+        names = query_params.get('name', [])  # Get names from query (default to empty list)
+        if isinstance(names, str):
+            names = [names]  # In case only one name is passed as a string
 
-    def do_GET(self):
-        # Load the data from the JSON file
-        data = load_data()
-
-        # Parse the query parameters
-        query_params = parse_qs(urlparse(self.path).query)
-        names = query_params.get("name", [])
+        # Find the marks for the requested names
+        result = []
+        for name in names:
+            student = next((s for s in students_data if s['name'] == name), None)
+            if student:
+                result.append({"name": name, "marks": student["marks"]})
+            else:
+                result.append({"name": name, "marks": "Not Found"})
         
-        if not names:
-            self._send_json_response({"error": "No names provided"}, status_code=400)
-            return
-        
-        # Get the marks for the provided names
-        marks = get_marks(names, data)
-        self._send_json_response({"marks": marks})
-
-# Run the server (for local development testing)
-def run(server_class=HTTPServer, handler_class=RequestHandler, port=8000):
-    server_address = ('', port)
-    httpd = server_class(server_address, handler_class)
-    print(f"Server running on port {port}...")
-    httpd.serve_forever()
-
-if __name__ == "__main__":
-    run()
+        # Return the result as a JSON response
+        return json.dumps(result)
+    
+    except Exception as e:
+        # Catch any exceptions and return a 500 error with a message
+        return json.dumps({"error": f"An error occurred: {str(e)}"}), 500
